@@ -1,0 +1,128 @@
+diff --git a/Makefile b/Makefile
+index 4e88dcc..e921a39 100644
+--- a/Makefile
++++ b/Makefile
+@@ -913,7 +913,7 @@ export mod_sign_cmd
+ 
+ 
+ ifeq ($(KBUILD_EXTMOD),)
+-core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/
++core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/ proyecto_1/
+ 
+ vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
+ 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
+diff --git a/arch/x86/entry/syscalls/syscall_64.tbl b/arch/x86/entry/syscalls/syscall_64.tbl
+index e93ef0b..4b2e691 100644
+--- a/arch/x86/entry/syscalls/syscall_64.tbl
++++ b/arch/x86/entry/syscalls/syscall_64.tbl
+@@ -338,6 +338,8 @@
+ 329	common	pkey_mprotect		sys_pkey_mprotect
+ 330	common	pkey_alloc		sys_pkey_alloc
+ 331	common	pkey_free		sys_pkey_free
++332	common	set_security_level	sys_set_security_level
++333	common	get_security_level	sys_get_security_level
+ 
+ #
+ # x32-specific system call numbers start at 512 to avoid cache impact
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index 75d4bee..17fbc79 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -1753,6 +1753,7 @@ struct task_struct {
+ 
+ 	pid_t pid;
+ 	pid_t tgid;
++	int security_level;
+ 
+ #ifdef CONFIG_CC_STACKPROTECTOR
+ 	/* Canary value for the -fstack-protector gcc feature */
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index 91a740f..84b900a 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -902,5 +902,7 @@ asmlinkage long sys_pkey_mprotect(unsigned long start, size_t len,
+ 				  unsigned long prot, int pkey);
+ asmlinkage long sys_pkey_alloc(unsigned long flags, unsigned long init_val);
+ asmlinkage long sys_pkey_free(int pkey);
++asmlinkage long sys_set_security_level(void);
++asmlinkage int sys_get_security_level(int pid);
+ 
+ #endif
+diff --git a/kernel/fork.c b/kernel/fork.c
+index 9321b1a..76e56f4 100644
+--- a/kernel/fork.c
++++ b/kernel/fork.c
+@@ -1961,6 +1961,7 @@ long _do_fork(unsigned long clone_flags,
+ 
+ 		pid = get_task_pid(p, PIDTYPE_PID);
+ 		nr = pid_vnr(pid);
++		p->security_level = 0;
+ 
+ 		if (clone_flags & CLONE_PARENT_SETTID)
+ 			put_user(nr, parent_tidptr);
+diff --git a/proyecto_1/Makefile b/proyecto_1/Makefile
+new file mode 100644
+index 0000000..d69c369
+--- /dev/null
++++ b/proyecto_1/Makefile
+@@ -0,0 +1 @@
++obj-y := proyecto_1.o
+diff --git a/proyecto_1/proyecto_1.c b/proyecto_1/proyecto_1.c
+new file mode 100644
+index 0000000..3ff600b
+--- /dev/null
++++ b/proyecto_1/proyecto_1.c
+@@ -0,0 +1,53 @@
++# include <linux/pid.h>
++# include <linux/sched.h>
++# include <linux/kernel.h>
++
++asmlinkage int sys_get_security_level (int pid) //get accessor method
++{
++    struct task_struct *task;
++    for_each_process (task) //return security level
++        if (pid == task->pid) return task->security_level;
++    return -1; //if pid != task->pid
++}
++
++asmlinkage int sys_set_security_level(int pid, int new_level) //setter method
++{
++    struct task_struct *task;
++    if (current_euid().val != 0) //EUID comparison
++    {
++        if (new_level >=0 || (new_level <= current->security_level)) //check new_level comparison
++        {
++           if (pid != current->pid) //not equal
++	            for_each_process(task) //for loop of processes
++               {
++                    if(pid == task->pid && (task->security_level != current->security_level))
++                    {
++                        task->security_level = new_level;
++                        return new_level;
++                    }
++                    else if(pid == task->pid)
++                    {
++                        return -1;
++                    }
++               }
++            else //return new security level
++            {
++                current->security_level = new_level;
++                return new_level;
++            }//end else
++            //
++        }//end outer if
++        return -1; // if new_level is a higher number, then -1 must be returned
++    }		   // to satisfy project specifications
++    else
++    {
++        if (new_level >= 0)
++            for_each_process(task) //for loop of processes
++                if(pid == task->pid) //update security level
++                {
++                    task->security_level = new_level;
++                    return new_level;
++                }
++        return -1; //if new_level < 0 or pid != task->pid
++    }//end outer outer else
++}
