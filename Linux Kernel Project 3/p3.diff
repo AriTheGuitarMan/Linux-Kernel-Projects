@@ -1,0 +1,155 @@
+diff --git a/Makefile b/Makefile
+index 4e88dcc..d5e7399 100644
+--- a/Makefile
++++ b/Makefile
+@@ -913,7 +913,7 @@ export mod_sign_cmd
+ 
+ 
+ ifeq ($(KBUILD_EXTMOD),)
+-core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/
++core-y		+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ block/ el_proyecto_3/
+ 
+ vmlinux-dirs	:= $(patsubst %/,%,$(filter %/, $(init-y) $(init-m) \
+ 		     $(core-y) $(core-m) $(drivers-y) $(drivers-m) \
+diff --git a/arch/x86/entry/syscalls/syscall_64.tbl b/arch/x86/entry/syscalls/syscall_64.tbl
+index e93ef0b..8b3cec3 100644
+--- a/arch/x86/entry/syscalls/syscall_64.tbl
++++ b/arch/x86/entry/syscalls/syscall_64.tbl
+@@ -338,6 +338,8 @@
+ 329	common	pkey_mprotect		sys_pkey_mprotect
+ 330	common	pkey_alloc		sys_pkey_alloc
+ 331	common	pkey_free		sys_pkey_free
++332	common	set_classification	sys_set_classification
++333	common	get_classification	sys_get_classification
+ 
+ #
+ # x32-specific system call numbers start at 512 to avoid cache impact
+diff --git a/el_proyecto_3/Makefile b/el_proyecto_3/Makefile
+new file mode 100644
+index 0000000..65552aa
+--- /dev/null
++++ b/el_proyecto_3/Makefile
+@@ -0,0 +1 @@
++obj-y := el_proyecto_3.o
+diff --git a/el_proyecto_3/el_proyecto_3.c b/el_proyecto_3/el_proyecto_3.c
+new file mode 100644
+index 0000000..28b4369
+--- /dev/null
++++ b/el_proyecto_3/el_proyecto_3.c
+@@ -0,0 +1,80 @@
++#include <linux/fs.h>
++#include <linux/types.h>
++#include <linux/mount.h>
++#include <linux/xattr.h>
++#include <linux/string.h>
++#include <linux/slab.h>
++#include <linux/module.h>
++#include <linux/init.h>
++#include <linux/namei.h>
++#include <linux/kernel.h>
++#include <linux/sched.h>
++#include <linux/pid.h>
++#include <linux/path.h>
++#include <linux/dcache.h>
++
++asmlinkage int sys_set_classification(const char *filename, int new_class)
++{
++    //este_es_el_camino ==> the path from path.h
++    //intermed_io ==> value of buffer as an intermediary figure significance module of thinking
++    //permanente_identification == classification style for user (const so permanent)
++    const char* permanente_identificacion = "user.classification";
++    int isThisPathValid;
++    struct path este_es_el_camino;//using path.h
++    isThisPathValid = kern_path(filename, LOOKUP_FOLLOW, &este_es_el_camino);
++    int formulatePath;
++    int value_zero = 0;
++    int value_neg_one = -1;
++    if( isThisPathValid) return value_neg_one;//here we get the path! :)
++    //is this path Valid?
++    //else
++    const int nuevo_valor_permissions = new_class;
++    const int* pointer_to_nuevo_valor_permissions = &nuevo_valor_permissions;
++    if( vfs_setxattr(este_es_el_camino.dentry, permanente_identificacion, pointer_to_nuevo_valor_permissions, sizeof(int), 0) != 0)//returned from vfs_setxattr
++    {
++    	return value_neg_one; //return. Not permitted.
++    }
++    return new_class;//default case, it seems
++}
++
++asmlinkage int sys_get_classification (const char *filename)
++{
++    //este_es_el_camino ==> the path from path.h
++    //intermed_io ==> value of buffer as an intermediary figure significance module of thinking
++    //permanente_identification == classification style for user (const so permanent)
++    const char* permanente_identificacion = "user.classification";
++    int isThisPathValid;
++    struct path este_es_el_camino;//using path.h
++    isThisPathValid = kern_path(filename, LOOKUP_FOLLOW, &este_es_el_camino);
++    int formulatePath;
++    int value_zero = 0;
++    int value_neg_one = -1;
++    if( isThisPathValid) return value_neg_one;//here we get the path! :)
++    //is this path Valid?
++    //else
++    int *intermed_io;//value
++    intermed_io = kmalloc(sizeof(int), GFP_KERNEL);
++    int pointer_to_intermed_io = *intermed_io;
++    ssize_t vfs_get_le_decidire = vfs_getxattr(este_es_el_camino.dentry, permanente_identificacion, intermed_io, sizeof(int));//returned from vfs_getxattr
++    ssize_t vfs_get_le_decidire2 = vfs_getxattr(este_es_el_camino.dentry, permanente_identificacion, intermed_io, sizeof(int));
++    kfree(intermed_io);
++    if(vfs_get_le_decidire == -61)//return 0
++    {
++    	return value_zero;//
++
++    }
++    else if(vfs_get_le_decidire == -13)//return -1
++    {
++    	return value_neg_one;//
++
++    }
++    else//else if not -13 not -61
++    {
++    	return pointer_to_intermed_io;
++
++    }
++    //return NULL;
++    //this works so no default return needed
++    //
++}
++
+diff --git a/fs/inode.c b/fs/inode.c
+index 3844c31..f56c894f3 100644
+--- a/fs/inode.c
++++ b/fs/inode.c
+@@ -132,6 +132,7 @@ int inode_init_always(struct super_block *sb, struct inode *inode)
+ 	static const struct file_operations no_open_fops = {.open = no_open};
+ 	struct address_space *const mapping = &inode->i_data;
+ 
++	inode->i_classification = 0;
+ 	inode->i_sb = sb;
+ 	inode->i_blkbits = sb->s_blocksize_bits;
+ 	inode->i_flags = 0;
+diff --git a/include/linux/fs.h b/include/linux/fs.h
+index 18bd249..e89a378 100644
+--- a/include/linux/fs.h
++++ b/include/linux/fs.h
+@@ -607,6 +607,7 @@ struct inode {
+ 	kuid_t			i_uid;
+ 	kgid_t			i_gid;
+ 	unsigned int		i_flags;
++	unsigned int		i_classification;
+ 
+ #ifdef CONFIG_FS_POSIX_ACL
+ 	struct posix_acl	*i_acl;
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index 91a740f..edd21a5 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -902,5 +902,7 @@ asmlinkage long sys_pkey_mprotect(unsigned long start, size_t len,
+ 				  unsigned long prot, int pkey);
+ asmlinkage long sys_pkey_alloc(unsigned long flags, unsigned long init_val);
+ asmlinkage long sys_pkey_free(int pkey);
++asmlinkage long sys_set_classification(char * filename, int new_class);
++asmlinkage int sys_get_classification(char * filename);
+ 
+ #endif
