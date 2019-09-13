@@ -1,0 +1,12 @@
+diff --git a/arch/x86/boot/compressed/misc.c b/arch/x86/boot/compressed/misc.c
+index c945acd..319cbb7 100644
+--- a/arch/x86/boot/compressed/misc.c
++++ b/arch/x86/boot/compressed/misc.c
+@@ -406,6 +406,6 @@ asmlinkage __visible void *extract_kernel(void *rmode, memptr heap,
+ 			NULL, error);
+ 	parse_elf(output);
+ 	handle_relocations(output, output_len, virt_addr);
+-	debug_putstr("done.\nBooting the kernel.\n");
++	debug_putstr("done.\nBooting the kernel.\n\n##### Ariel Wald. Hello there! To be or not to be... That is the Question! #####\n\n");
+ 	return output;
+ }
